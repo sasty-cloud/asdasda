@@ -1,1 +1,1 @@
-loadstring(game.HttpGet("https://github.com/sasty-cloud/asdasda/edit/main/Sasty%20Hub"))()
+loadstring(game.HttpGet("https://raw.githubusercontent.com/sasty-cloud/asdasda/refs/heads/main/Sasty%20Hub"))()
