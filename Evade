@@ -1,1 +1,286 @@
-loadstring("\112\114\105\110\116\40\34\32\89\79\85\82\32\83\67\82\73\80\84\32\72\69\82\69\33\33\32\34\41\10")()
+--[[
+	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
+]]
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local TweenService = game:GetService("TweenService")
+
+local Loading = Library:Notify({
+    Title = "Loading...",
+    Description = "It might take a while.",
+    Time = 5,
+})
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ForceCheckbox = true 
+Library.ShowToggleFrameInKeybinds = true
+
+local Window = Library:CreateWindow({
+	Title = "Sasty Hub",
+	Footer = "ver. 0.0.1",
+	NotifySide = "Right",
+	ShowCustomCursor = true,
+})
+
+local Tabs = {
+	Farmz = Window:AddTab("Farm Tweaks", "user"),
+	["UI Settings"] = Window:AddTab("UI Settings", "settings"),
+}
+
+local MenuGroup2 = Tabs.Farmz:AddLeftGroupbox("Farm", "wrench")
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
+
+MenuGroup:AddToggle("KeybindMenuOpen", {
+	Default = Library.KeybindFrame.Visible,
+	Text = "Open Keybind Menu",
+	Callback = function(value)
+		Library.KeybindFrame.Visible = value
+	end,
+})
+MenuGroup:AddToggle("ShowCustomCursor", {
+	Text = "Custom Cursor",
+	Default = true,
+	Callback = function(Value)
+		Library.ShowCustomCursor = Value
+	end,
+})
+MenuGroup:AddDropdown("NotificationSide", {
+	Values = { "Left", "Right" },
+	Default = "Right",
+	Text = "Notification Side",
+	Callback = function(Value)
+		Library:SetNotifySide(Value)
+	end,
+})
+MenuGroup:AddDropdown("DPIDropdown", {
+	Values = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" },
+	Default = "100%",
+	Text = "DPI Scale",
+	Callback = function(Value)
+		Value = Value:gsub("%%", "")
+		local DPI = tonumber(Value)
+		Library:SetDPIScale(DPI)
+	end,
+})
+MenuGroup:AddDivider()
+MenuGroup:AddLabel("Menu bind")
+	:AddKeyPicker("MenuKeybind", { Default = "RightShift", NoUI = true, Text = "Menu keybind" })
+
+MenuGroup:AddButton("Unload", function()
+	Library:Unload()
+end)
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("MyScriptHub")
+SaveManager:SetFolder("MyScriptHub/specific-game")
+SaveManager:SetSubFolder("specific-place")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+SaveManager:LoadAutoloadConfig()
+
+local EvadeExploitEnabled = false
+local autoFarmEnabled = false
+local platform = nil
+local platformPosition = nil
+local character = nil
+local humanoidRootPart = nil
+
+local TWEEN_TIME = 0.1
+local UNDER_OFFSET = 2 -- başlangıç değeri
+
+-- 0.5 saniyede bir 0 ve 2 arasında geçiş yap
+spawn(function()
+    while true do
+        UNDER_OFFSET = 2
+        wait(0.03)
+        UNDER_OFFSET = 7
+        wait(0.03)
+    end
+end) -- studs under
+
+local player = game.Players.LocalPlayer
+
+local function createPlatform()
+    if platform then
+        platform:Destroy()
+    end
+    
+    platform = Instance.new("Part")
+    platform.Name = "AutoFarmPlatform"
+    platform.Size = Vector3.new(1000, 1, 1000)
+    platform.Material = Enum.Material.Neon
+    platform.BrickColor = BrickColor.new("Bright green")
+    platform.Anchored = true
+    platform.CanCollide = true
+    platform.Position = Vector3.new(0, 5000, 0) -- High up in the air
+    platform.Parent = workspace
+    platform.Transparency = 0.9
+    platformPosition = platform.Position + Vector3.new(0, platform.Size.Y / 2 + 3, 0) -- 0 studs above the platform
+end
+
+local function tweenToPosition(targetPosition)
+    if character and humanoidRootPart then
+        local tweenInfo = TweenInfo.new(
+            TWEEN_TIME,
+            Enum.EasingStyle.Quad,
+            Enum.EasingDirection.Out
+        )
+        local tween = TweenService:Create(humanoidRootPart, tweenInfo, {CFrame = CFrame.new(targetPosition)})
+        tween:Play()
+        -- Removed Completed:Wait() to allow constant updating
+    end
+end
+
+local function updateCharacter()
+    character = player.Character or player.CharacterAdded:Wait()
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+    if autoFarmEnabled then
+        createPlatform()
+        tweenToPosition(platformPosition)
+    end
+end
+
+local function checkAndCollectTickets()
+    if not autoFarmEnabled then return end
+    
+    if not character or not humanoidRootPart then
+        updateCharacter()
+    end
+    
+    local ticketsFolder = workspace:FindFirstChild("Game") and workspace.Game:FindFirstChild("Effects") and workspace.Game.Effects:FindFirstChild("Tickets")
+    if not ticketsFolder then 
+        tweenToPosition(platformPosition)
+        return 
+    end
+    
+    local visuals = {}
+    for _, child in ipairs(ticketsFolder:GetChildren()) do
+        if child.Name == "Visual" and child:IsA("Model") then
+            table.insert(visuals, child)
+        end
+    end
+    
+    if #visuals == 0 then
+        tweenToPosition(platformPosition)
+        return
+    end
+    
+    for _, visual in ipairs(visuals) do
+        while visual and visual.Parent do
+            local ticketPosition = visual.PrimaryPart and visual.PrimaryPart.Position or visual:GetModelCFrame().Position
+            if ticketPosition then
+                local underPosition = ticketPosition - Vector3.new(0, UNDER_OFFSET, 0)
+                tweenToPosition(underPosition)
+                wait(0.1)
+            else
+                break
+            end
+        end
+    end
+    
+    tweenToPosition(platformPosition)
+end
+
+local function startAutoFarm()
+    updateCharacter()
+    player.CharacterAdded:Connect(updateCharacter)
+    
+    spawn(function()
+        while autoFarmEnabled do
+            checkAndCollectTickets()
+            wait(0.1) 
+        end
+    end)
+end
+
+local function stopAutoFarm()
+    autoFarmEnabled = false
+    if platform then
+        platform:Destroy()
+        platform = nil
+    end
+end
+
+local autoFarmToggle = MenuGroup2:AddToggle("AutoFarmTickets", {
+    Text = "Auto Farm Event",
+    Default = false,
+    Callback = function(value)
+        autoFarmEnabled = value
+        if value then
+            startAutoFarm()
+        else
+            stopAutoFarm()
+        end
+    end
+}),
+
+local EvadeToggle = MenuGroup2:AddToggle("EvadeExploit", {
+	Text = "Auto Revive + Speed",
+	Default = false,
+	Callback = function(value)
+		EvadeExploitEnabled = value
+
+		if value then
+			task.spawn(function()
+				while EvadeExploitEnabled do
+					local player = game.Players.LocalPlayer
+					local char = player.Character
+					
+					if char and char:FindFirstChild("Humanoid") then
+						char.Humanoid.WalkSpeed = 80
+					end
+					
+					task.wait(0.1)
+				end
+			end)
+		end
+	end
+})
+
+local Exchange = MenuGroup2:AddToggle("Exchange", {
+    Text = "Toggle Exchange Menu",
+    Default = false,
+    Callback = function(value)
+        game.Players.LocalPlayer.PlayerGui.Menu.Views.Battlepass.Exchange.Visible = value
+    end
+})
+local unlockLoop = nil
+
+local Unlock = MenuGroup2:AddToggle("Unlock", {
+    Text = "Toggle 'Unlock In: XX:XX'",
+    Default = true,
+    Callback = function(value)
+        if value then
+            -- Stop loop when true
+            if unlockLoop then
+                unlockLoop:Disconnect()
+                unlockLoop = nil
+            end
+            game:GetService("Players").LocalPlayer.PlayerGui.Menu.Views.Battlepass.ViewPass.Center.ViewPass.Unlocked.Visible = true
+        else
+            -- Start loop when false
+            unlockLoop = game:GetService("RunService").Heartbeat:Connect(function()
+                local unlocked = game:GetService("Players").LocalPlayer.PlayerGui.Menu.Views.Battlepass.ViewPass.Center.ViewPass.Unlocked
+                if unlocked and unlocked.Parent then
+                    unlocked.Visible = false
+                end
+            end)
+        end
+    end
+})
+
+-- Initial state
+Unlock.Callback(true)
