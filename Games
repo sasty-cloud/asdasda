@@ -1,0 +1,5 @@
+local Games = {
+  [3808081382] = "https://raw.githubusercontent.com/AhmadV99/Script-Games/main/The%20Strongest%20Battleground.lua",  -- The Strongest Battlegrounds
+  [9872472334] = 
+}
+return Games
